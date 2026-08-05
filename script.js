@@ -42,7 +42,13 @@
   const TOAST_MS         = 1600;
 
   const songs = Array.isArray(window.SONGS) ? window.SONGS.slice() : [];
-  const DEFAULT_TOLERANCE_MS = window.DEFAULT_TOLERANCE_MS || 180;
+  // Two windows around the exact beat: inside the tighter one = "Perfect!",
+  // inside the wider one (but outside the tight one) = "Great!", anything
+  // beyond that = "Missed It". Generous on purpose — real touchscreens and
+  // speakers add their own latency, so a razor-thin window just punishes
+  // people for the hardware, not their timing.
+  const DEFAULT_PERFECT_TOLERANCE_MS = window.DEFAULT_PERFECT_TOLERANCE_MS || 150;
+  const DEFAULT_GREAT_TOLERANCE_MS   = window.DEFAULT_GREAT_TOLERANCE_MS   || 350;
 
   /* --------------------------- Web Audio engine --------------------------- */
   let audioCtx = null;
@@ -275,22 +281,38 @@
     state = STATE.RESULT;
     appEl.classList.remove("is-playing");
 
-    const toleranceMs = (currentSong && currentSong.toleranceMs) || DEFAULT_TOLERANCE_MS;
-    const perfect = tapped && Math.abs(diffMs) <= toleranceMs;
+    const perfectMs = (currentSong && currentSong.perfectToleranceMs) || DEFAULT_PERFECT_TOLERANCE_MS;
+    const greatMs   = (currentSong && currentSong.greatToleranceMs)   || DEFAULT_GREAT_TOLERANCE_MS;
+    const absDiff = tapped ? Math.abs(diffMs) : Infinity;
 
-    resultOverlay.classList.remove("win", "miss");
-    resultOverlay.classList.add(perfect ? "win" : "miss");
+    let tier; // "perfect" | "great" | "miss"
+    if (tapped && absDiff <= perfectMs) tier = "perfect";
+    else if (tapped && absDiff <= greatMs) tier = "great";
+    else tier = "miss";
 
-    if (perfect) {
+    resultOverlay.classList.remove("tier-perfect", "tier-great", "tier-miss");
+    resultOverlay.classList.add("tier-" + tier);
+
+    if (tier === "perfect") {
       resultKicker.textContent = "Nailed It";
       resultHeadline.textContent = "Perfect!";
       resultSub.textContent = "You caught it right on the beat of \u201c" + currentSong.title + ".\u201d";
       resultMs.style.display = "";
-      resultMs.className = "result-ms perfect";
+      resultMs.className = "result-ms tier-perfect";
       resultMs.textContent = formatMs(diffMs);
       timingMeter.style.display = "none";
       playSfx("success");
-      launchConfetti();
+      launchConfetti(1);
+    } else if (tier === "great") {
+      resultKicker.textContent = "Nice Catch";
+      resultHeadline.textContent = "Great!";
+      resultSub.textContent = "Right in the pocket on \u201c" + currentSong.title + ".\u201d";
+      resultMs.style.display = "";
+      resultMs.className = "result-ms tier-great";
+      resultMs.textContent = formatMs(diffMs);
+      timingMeter.style.display = "none";
+      playSfx("success");
+      launchConfetti(0.55);
     } else if (tapped) {
       resultKicker.textContent = "Missed It";
       resultHeadline.textContent = "Better Luck Next Time!";
@@ -330,7 +352,7 @@
 
     resultOverlay.classList.remove("is-visible");
     resultOverlay.setAttribute("aria-hidden", "true");
-    setTimeout(() => resultOverlay.classList.remove("win", "miss"), 400);
+    setTimeout(() => resultOverlay.classList.remove("tier-perfect", "tier-great", "tier-miss"), 400);
 
     drumPad.disabled = true;
     drumPad.classList.remove("is-active", "is-hit");
@@ -362,14 +384,16 @@
   let confettiParticles = [];
   const CONFETTI_COLORS = ["#f4b942", "#ffe1a1", "#81d1d8", "#ffffff", "#ef7a5f"];
 
-  function launchConfetti() {
+  function launchConfetti(intensity) {
+    intensity = intensity || 1;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     confettiCanvas.width = confettiCanvas.clientWidth * dpr;
     confettiCanvas.height = confettiCanvas.clientHeight * dpr;
     confettiCtx = confettiCanvas.getContext("2d");
 
     const w = confettiCanvas.width, h = confettiCanvas.height;
-    confettiParticles = Array.from({ length: 130 }, () => ({
+    const count = Math.round(130 * intensity);
+    confettiParticles = Array.from({ length: count }, () => ({
       x: w / 2 + (Math.random() - 0.5) * w * 0.5,
       y: h * 0.28 + (Math.random() - 0.5) * 40 * dpr,
       vx: (Math.random() - 0.5) * 7 * dpr,

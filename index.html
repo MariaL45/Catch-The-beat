@@ -28,7 +28,6 @@
 
     <!-- ---- Header ---- -->
     <header class="stage-header">
-      <p class="eyebrow">Event Activation</p>
       <h1 class="title">Catch <span class="title-accent">The</span> Beat</h1>
     </header>
 
@@ -37,7 +36,7 @@
       <div class="vinyl-wrap">
         <div class="vinyl-glow" aria-hidden="true"></div>
 
-        <button id="vinylBtn" class="vinyl-hit-target" type="button" aria-label="Tap the record to start">
+        <button id="vinylBtn" class="vinyl-hit-target" type="button" aria-label="Spin the record to start">
           <div class="vinyl" id="vinyl">
             <img src="assets/images/icon-512.png" alt="" class="vinyl-img" draggable="false" />
           </div>
@@ -53,6 +52,12 @@
       </div>
     </section>
 
+    <!-- ---- CTA (idle state) — sits directly under the record ---- -->
+    <button id="ctaBtn" class="cta-button" type="button" disabled>
+      <span class="cta-pulse" aria-hidden="true"></span>
+      <span class="cta-label">Spin The Record</span>
+    </button>
+
     <!-- ---- Song info / instructions ---- -->
     <section class="song-info" id="songInfo">
       <p class="song-label">Now Cued Up</p>
@@ -63,12 +68,6 @@
         <span id="songHint">Getting the next track ready…</span>
       </p>
     </section>
-
-    <!-- ---- CTA (idle state) ---- -->
-    <button id="ctaBtn" class="cta-button" type="button" disabled>
-      <span class="cta-pulse" aria-hidden="true"></span>
-      <span class="cta-label">Tap The Record To Start</span>
-    </button>
 
     <!-- ---- Cymbal pad ---- -->
     <section class="drum-zone">
