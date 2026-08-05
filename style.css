@@ -108,7 +108,7 @@ img { -webkit-user-drag: none; user-select: none; }
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: clamp(14px, 3.2vh, 30px) clamp(16px, 5vw, 32px) clamp(10px, 2vh, 20px);
+  padding: clamp(10px, 2.4vh, 24px) clamp(16px, 5vw, 32px) clamp(8px, 1.6vh, 16px);
   text-align: center;
 }
 
@@ -142,7 +142,7 @@ img { -webkit-user-drag: none; user-select: none; }
 
 .vinyl-wrap {
   position: relative;
-  width: clamp(182px, 44vh, 340px);
+  width: clamp(230px, 58vh, 470px);
   aspect-ratio: 1 / 1;
 }
 
@@ -294,6 +294,18 @@ img { -webkit-user-drag: none; user-select: none; }
   align-items: center;
   gap: 2px;
   margin: clamp(4px, 1.4vh, 12px) 0;
+  max-height: 260px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.4s var(--ease-smooth), opacity 0.3s ease, margin 0.4s ease;
+}
+/* Idle/home screen stays a mystery — no song name, artist, or hint until
+   the record actually starts spinning. */
+.app.is-idle .song-info {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+  pointer-events: none;
 }
 .song-label {
   margin: 0;
@@ -365,8 +377,11 @@ img { -webkit-user-drag: none; user-select: none; }
   letter-spacing: 0.06em;
   text-transform: uppercase;
   box-shadow: 0 10px 26px rgba(244,185,66,0.35), 0 2px 0 rgba(255,255,255,0.35) inset;
-  transition: opacity 0.35s var(--ease-smooth), transform 0.35s var(--ease-smooth), filter 0.3s ease;
+  transition: opacity 0.3s var(--ease-smooth), transform 0.3s var(--ease-smooth), filter 0.3s ease,
+              padding 0.35s var(--ease-smooth), margin 0.35s var(--ease-smooth), max-height 0.35s var(--ease-smooth);
   margin: clamp(4px, 1.6vh, 14px) 0;
+  max-height: 120px;
+  overflow: hidden;
 }
 .cta-button:disabled { filter: grayscale(0.6) brightness(0.85); }
 .cta-button:active:not(:disabled) { transform: scale(0.96); }
@@ -390,6 +405,10 @@ img { -webkit-user-drag: none; user-select: none; }
   opacity: 0;
   pointer-events: none;
   transform: translateY(6px) scale(0.94);
+  padding-top: 0;
+  padding-bottom: 0;
+  margin: 0;
+  max-height: 0;
 }
 
 /* -------------------------------- Drum pad -------------------------------- */
@@ -524,10 +543,10 @@ img { -webkit-user-drag: none; user-select: none; }
 .drum-caption {
   position: relative;
   z-index: 2;
-  margin: 0;
-  font-size: clamp(12.5px, 2.8vw, 15px);
+  margin: clamp(6px, 1.6vh, 14px) 0 0;
+  font-size: clamp(10.5px, 2.2vw, 12.5px);
   font-weight: 500;
-  color: rgba(255,255,255,0.78);
+  color: rgba(255,255,255,0.55);
   min-height: 1.4em;
 }
 
@@ -594,7 +613,7 @@ img { -webkit-user-drag: none; user-select: none; }
   text-shadow: 0 6px 30px rgba(0,0,0,0.4);
 }
 .result-overlay.tier-perfect .result-headline { color: var(--gold); }
-.result-overlay.tier-great .result-headline { color: var(--teal-bright); }
+.result-overlay.tier-good .result-headline { color: var(--teal-bright); }
 .result-overlay.tier-miss .result-headline { color: var(--cream); }
 
 .result-sub {
@@ -612,7 +631,7 @@ img { -webkit-user-drag: none; user-select: none; }
   margin-top: 4px;
 }
 .result-ms.tier-perfect { color: var(--gold); }
-.result-ms.tier-great { color: var(--teal-bright); }
+.result-ms.tier-good { color: var(--teal-bright); }
 .result-ms.early { color: var(--teal-bright); }
 .result-ms.late { color: var(--coral); }
 
@@ -672,27 +691,34 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 
 /* ============================ Staff reset ================================
-   This is intentionally invisible — it's an event-staff-only control, not
-   a "back to home" button meant for players to see. opacity:0 guarantees
-   zero visual trace (unlike a transparent background, which can still
-   pick up a faint edge/outline in some browsers) while staying fully
-   tappable — opacity never affects hit-testing or pointer events. */
+   Event-staff-only control, not a player-facing "home" button. Faint on
+   purpose — visible enough that staff who know to look in the corner can
+   find it, subtle enough that it doesn't read as a normal UI element to
+   the general public. */
 .staff-reset {
   position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 64px;
-  height: 64px;
+  bottom: 6px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
   z-index: 30;
   background: transparent;
   border: none;
   outline: none;
   box-shadow: none;
-  opacity: 0;
+  opacity: 0.16;
+  color: var(--cream);
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   -webkit-appearance: none;
   appearance: none;
+  transition: opacity 0.2s ease;
 }
+.staff-reset:active { opacity: 0.4; }
 .staff-reset-toast {
   position: fixed;
   bottom: 18px;

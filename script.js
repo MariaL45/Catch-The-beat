@@ -38,17 +38,18 @@
     miss:    "assets/sounds/miss-thud.wav"
   };
   const AUTO_RESET_MS   = 7000;  // idle screen returns automatically after a result
-  const LATE_GRACE_MS   = 4500;  // if nobody hits the pad this long after the target, auto-resolve as a miss
+  const LATE_GRACE_MS   = 5500;  // if nobody hits the pad this long after the target, auto-resolve as a miss
+  const POST_ROUND_PLAY_MS = 3200; // how long the song keeps playing after a hit/miss before fading out
   const TOAST_MS         = 1600;
 
   const songs = Array.isArray(window.SONGS) ? window.SONGS.slice() : [];
   // Two windows around the exact beat: inside the tighter one = "Perfect!",
-  // inside the wider one (but outside the tight one) = "Great!", anything
-  // beyond that = "Missed It". Generous on purpose — real touchscreens and
-  // speakers add their own latency, so a razor-thin window just punishes
-  // people for the hardware, not their timing.
+  // inside the wider one (but outside the tight one, early OR late) =
+  // "Good!", anything beyond that = "Missed It". Generous on purpose —
+  // real touchscreens and speakers add their own latency, so a razor-thin
+  // window just punishes people for the hardware, not their timing.
   const DEFAULT_PERFECT_TOLERANCE_MS = window.DEFAULT_PERFECT_TOLERANCE_MS || 150;
-  const DEFAULT_GREAT_TOLERANCE_MS   = window.DEFAULT_GREAT_TOLERANCE_MS   || 350;
+  const DEFAULT_GOOD_TOLERANCE_MS    = window.DEFAULT_GOOD_TOLERANCE_MS    || 500;
 
   /* --------------------------- Web Audio engine --------------------------- */
   let audioCtx = null;
@@ -106,17 +107,39 @@
   let sourceNode = null;
   let gainNode = null;
   let songStartCtxTime = 0;
+  let currentStartOffset = 0;
   let hasTapped = false;
   let lateTimer = null;
   let resetTimer = null;
+  let postRoundFadeTimer = null;
 
   /* ------------------------------ Song rotation --------------------------- */
-  function pickNextIndex(excludeIndex) {
+  // Shuffle-bag: play through every song once, in random order, before
+  // reshuffling for the next full pass — avoids the same song popping up
+  // twice within a handful of rounds like pure random selection would.
+  let shuffleBag = [];
+  let lastPlayedIndex = -1;
+
+  function refillShuffleBag() {
+    const arr = songs.map((_, i) => i);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    // Avoid an immediate repeat right at the seam between one bag and the next.
+    if (arr.length > 1 && arr[0] === lastPlayedIndex) {
+      const swapWith = 1 + Math.floor(Math.random() * (arr.length - 1));
+      const tmp = arr[0]; arr[0] = arr[swapWith]; arr[swapWith] = tmp;
+    }
+    shuffleBag = arr;
+  }
+
+  function drawNextIndex() {
     if (songs.length === 0) return -1;
     if (songs.length === 1) return 0;
-    let idx;
-    do { idx = Math.floor(Math.random() * songs.length); }
-    while (idx === excludeIndex);
+    if (shuffleBag.length === 0) refillShuffleBag();
+    const idx = shuffleBag.shift();
+    lastPlayedIndex = idx;
     return idx;
   }
 
@@ -196,25 +219,37 @@
     hasTapped = false;
     sourceNode = null;
 
+    // Some songs skip a dead intro (startOffset) and/or stop early
+    // (endOffset) rather than playing the whole file — both optional,
+    // set per-song in songs.js.
+    const startOffset = (currentSong && currentSong.startOffset) || 0;
+    const endOffset = currentSong && currentSong.endOffset;
+    const clipDuration = endOffset ? Math.max(0.1, endOffset - startOffset) : undefined;
+
     if (currentBuffer) {
       sourceNode = ctx.createBufferSource();
       sourceNode.buffer = currentBuffer;
       sourceNode.connect(gainNode);
       sourceNode.onended = handleSongEnded;
-      sourceNode.start(0);
+      if (clipDuration !== undefined) sourceNode.start(0, startOffset, clipDuration);
+      else sourceNode.start(0, startOffset);
     }
 
+    // songStartCtxTime marks the ctx-clock instant at which the file's
+    // playhead was at `startOffset` — so file-time = elapsed-since-start
+    // + startOffset. Every timing calculation below routes through this.
     songStartCtxTime = ctx.currentTime;
+    currentStartOffset = startOffset;
 
     drumPad.disabled = false;
     drumPad.classList.add("is-active");
     drumCaption.textContent = "Listen closely\u2026 strike the cymbal on the beat!";
 
     clearTimeout(lateTimer);
-    const lateAt = (currentSong.targetTime * 1000) + LATE_GRACE_MS;
+    const msUntilTarget = (currentSong.targetTime - startOffset) * 1000;
     lateTimer = setTimeout(() => {
       if (state === STATE.PLAYING && !hasTapped) handleMissTimeout();
-    }, lateAt);
+    }, msUntilTarget + LATE_GRACE_MS);
   }
 
   function handleSongEnded() {
@@ -235,13 +270,21 @@
     sourceNode = null;
   }
 
+  // The song keeps playing for a little while after the round ends (hit
+  // or missed) instead of cutting out abruptly — feels much nicer than a
+  // hard stop right as the result appears.
+  function scheduleFadeOut() {
+    clearTimeout(postRoundFadeTimer);
+    postRoundFadeTimer = setTimeout(fadeOutAndStop, POST_ROUND_PLAY_MS);
+  }
+
   function onDrumHit() {
     if (state !== STATE.PLAYING || hasTapped) return;
     hasTapped = true;
 
     const ctx = ensureCtx();
-    const tapTime = ctx.currentTime - songStartCtxTime;
-    const diffMs = (tapTime - currentSong.targetTime) * 1000;
+    const tapFileTime = (ctx.currentTime - songStartCtxTime) + currentStartOffset;
+    const diffMs = (tapFileTime - currentSong.targetTime) * 1000;
 
     clearTimeout(lateTimer);
     drumPad.disabled = true;
@@ -249,7 +292,7 @@
     drumPad.classList.add("is-hit");
     spawnRipple();
     playSfx("cymbal");
-    fadeOutAndStop();
+    scheduleFadeOut();
 
     resolveRound(diffMs, true);
   }
@@ -259,7 +302,7 @@
     hasTapped = true;
     drumPad.disabled = true;
     drumPad.classList.remove("is-active");
-    fadeOutAndStop();
+    scheduleFadeOut();
     resolveRound(null, false);
   }
 
@@ -282,15 +325,15 @@
     appEl.classList.remove("is-playing");
 
     const perfectMs = (currentSong && currentSong.perfectToleranceMs) || DEFAULT_PERFECT_TOLERANCE_MS;
-    const greatMs   = (currentSong && currentSong.greatToleranceMs)   || DEFAULT_GREAT_TOLERANCE_MS;
+    const goodMs    = (currentSong && currentSong.goodToleranceMs)    || DEFAULT_GOOD_TOLERANCE_MS;
     const absDiff = tapped ? Math.abs(diffMs) : Infinity;
 
-    let tier; // "perfect" | "great" | "miss"
+    let tier; // "perfect" | "good" | "miss"
     if (tapped && absDiff <= perfectMs) tier = "perfect";
-    else if (tapped && absDiff <= greatMs) tier = "great";
+    else if (tapped && absDiff <= goodMs) tier = "good";
     else tier = "miss";
 
-    resultOverlay.classList.remove("tier-perfect", "tier-great", "tier-miss");
+    resultOverlay.classList.remove("tier-perfect", "tier-good", "tier-miss");
     resultOverlay.classList.add("tier-" + tier);
 
     if (tier === "perfect") {
@@ -303,12 +346,12 @@
       timingMeter.style.display = "none";
       playSfx("success");
       launchConfetti(1);
-    } else if (tier === "great") {
-      resultKicker.textContent = "Nice Catch";
-      resultHeadline.textContent = "Great!";
+    } else if (tier === "good") {
+      resultKicker.textContent = "Good Catch";
+      resultHeadline.textContent = "Good!";
       resultSub.textContent = "Right in the pocket on \u201c" + currentSong.title + ".\u201d";
       resultMs.style.display = "";
-      resultMs.className = "result-ms tier-great";
+      resultMs.className = "result-ms tier-good";
       resultMs.textContent = formatMs(diffMs);
       timingMeter.style.display = "none";
       playSfx("success");
@@ -326,7 +369,7 @@
     } else {
       resultKicker.textContent = "Missed It";
       resultHeadline.textContent = "Better Luck Next Time!";
-      resultSub.textContent = "The moment slipped by \u2014 give it another go next round!";
+      resultSub.textContent = "\u00a0";
       resultMs.style.display = "none";
       timingMeter.style.display = "none";
       playSfx("miss");
@@ -342,6 +385,7 @@
   function resetToIdle(isStaffForced) {
     clearTimeout(resetTimer);
     clearTimeout(lateTimer);
+    clearTimeout(postRoundFadeTimer);
     stopConfetti();
     fadeOutAndStop();
     if (sourceNode) { try { sourceNode.stop(); } catch (e) {} sourceNode = null; }
@@ -352,7 +396,7 @@
 
     resultOverlay.classList.remove("is-visible");
     resultOverlay.setAttribute("aria-hidden", "true");
-    setTimeout(() => resultOverlay.classList.remove("tier-perfect", "tier-great", "tier-miss"), 400);
+    setTimeout(() => resultOverlay.classList.remove("tier-perfect", "tier-good", "tier-miss"), 400);
 
     drumPad.disabled = true;
     drumPad.classList.remove("is-active", "is-hit");
@@ -361,7 +405,7 @@
     hasTapped = false;
     pendingStart = false;
 
-    const nextIndex = pickNextIndex(currentSongIndex);
+    const nextIndex = drawNextIndex();
     loadRound(nextIndex);
 
     if (isStaffForced) {
@@ -477,7 +521,7 @@
     appEl.classList.add("is-idle");
     drumPad.disabled = true;
     drumCaption.textContent = "Waiting for the record to drop\u2026";
-    const firstIndex = pickNextIndex(-1);
+    const firstIndex = drawNextIndex();
     loadRound(firstIndex);
   }
 

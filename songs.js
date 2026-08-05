@@ -4,45 +4,34 @@
 
    HOW THIS FILE WORKS
    --------------------
-   Each song needs 4 things:
+   Each song needs:
      audio        -> filename inside assets/audio/ (must match exactly)
-     title        -> what's shown on screen
-     targetMoment -> the fun, in-the-moment cue shown to the player (what
-                     to listen for) — keep it short and give a real audible
-                     anchor, not just flavour text, since this is the only
-                     hint a first-time player gets.
-     targetTime   -> the EXACT second (with decimals) the cymbal should be hit
+     title        -> what's shown on screen (only revealed once the record
+                     is spinning — the idle screen shows no song info)
+     targetMoment -> the fun, in-the-moment cue shown to the player
+     targetTime   -> the EXACT second (in the MP3 file) the cymbal should
+                     be hit
+
+   Optional per song:
+     startOffset  -> second (in the MP3 file) where playback begins. Omit
+                     or 0 to start from the top. Used to skip a long intro.
+     endOffset    -> second (in the MP3 file) where playback is trimmed to
+                     stop. Omit to let it play to the end of the file.
+     perfectToleranceMs / goodToleranceMs -> per-song overrides of the
+                     global scoring windows defined at the bottom of this
+                     file (rarely needed).
 
    HOW targetTime WAS MEASURED
    ----------------------------
-   Your 13 MP3s were analyzed directly: a harmonic/percussive separation
-   pass isolates drum-like transients from vocals and sustained instruments,
-   then the sharpest percussive spike closest to the moment you described is
-   located and refined against the raw waveform. Real signal analysis of
-   your actual files, accurate to a few milliseconds.
-
-   One correction from the first pass: "Gimme! Gimme! Gimme!" was wrong —
-   the original analysis picked a very faint, quiet transient during the
-   song's atmospheric synth intro because that was the loudest thing inside
-   too narrow a search window. The real beat drop (and the moment right
-   before the "gimme gimme gimme" vocal hook) is at 0:17.9, not 0:08 — a
-   completely different, far stronger hit. Re-checked every other song
-   the same way; a few were nudged by a few hundred milliseconds to lock
-   onto the true nearest strong hit (Levitating, Blinding Lights, I Wanna
-   Dance With Somebody). Everything else held up on the re-check.
+   Every MP3 was analyzed directly with a percussive-onset detector
+   (harmonic/percussive separation isolates drum-like transients from
+   vocals, then the sharpest nearby percussive spike is located and
+   refined against the raw waveform). For the songs where you gave an
+   exact minute:second this round, that value was used as the anchor and
+   the analysis just pinpointed the precise millisecond right around it.
 
    `analyzed: true` marks a song whose targetTime came from this process.
-   `sourceTimestamp` records the approximate moment you originally described,
-   for reference.
-
-   SCORING
-   -------
-   Every song is judged against two windows around targetTime (set below,
-   or per-song via optional `perfectToleranceMs` / `greatToleranceMs`
-   fields): inside the tight window = "Perfect!", inside the wider window
-   = "Great!", outside both = "Missed It". Widened deliberately — real
-   touchscreens and speakers add their own latency, so a hair-trigger
-   window mostly punishes the hardware, not the player.
+   `sourceTimestamp` records what you told me, for reference.
    ========================================================================= */
 
 const SONGS = [
@@ -50,9 +39,10 @@ const SONGS = [
     audio: "I Will Always Love You.mp3",
     title: "I Will Always Love You",
     artist: "Whitney Houston",
-    targetMoment: "Catch it right before Whitney holds that legendary note.",
-    targetTime: 188.467,
-    sourceTimestamp: "3:08",
+    targetMoment: "Catch the drum right before Whitney holds that legendary note.",
+    targetTime: 190.296,
+    startOffset: 172.0, // 2:52 — skips straight to the buildup, no long intro
+    sourceTimestamp: "buzzer 3:10, playback starts 2:52",
     analyzed: true
   },
   {
@@ -77,7 +67,7 @@ const SONGS = [
     audio: "Blinding Lights.mp3",
     title: "Blinding Lights",
     artist: "The Weeknd",
-    targetMoment: "Hit it right before he starts trying to call you.",
+    targetMoment: "Catch it right before he tries to call you.",
     targetTime: 26.603,
     sourceTimestamp: "0:27",
     analyzed: true
@@ -104,9 +94,10 @@ const SONGS = [
     audio: "Gimme Gimme Gimme.mp3",
     title: "Gimme! Gimme! Gimme!",
     artist: "ABBA",
-    targetMoment: "Strike it the moment the beat drops, right before \u201cgimme, gimme, gimme!\u201d",
-    targetTime: 17.891,
-    sourceTimestamp: "0:08 (corrected after re-analysis \u2014 see note above)",
+    targetMoment: "Strike it right when the beat kicks back into gear.",
+    targetTime: 68.939,
+    startOffset: 47.0, // 0:47
+    sourceTimestamp: "buzzer 1:09, playback starts 0:47",
     analyzed: true
   },
   {
@@ -140,7 +131,7 @@ const SONGS = [
     audio: "Someone Like You.mp3",
     title: "Someone Like You",
     artist: "Adele",
-    targetMoment: "Strike it just before Adele lets go and moves on.",
+    targetMoment: "Catch it right before she sings \u201csomeone like you\u201d for the first time.",
     targetTime: 74.014,
     sourceTimestamp: "1:14",
     analyzed: true
@@ -149,9 +140,10 @@ const SONGS = [
     audio: "Rolling In The Deep.mp3",
     title: "Rolling In The Deep",
     artist: "Adele",
-    targetMoment: "Catch it the instant she sings \u201cwe could have had it all.\u201d",
-    targetTime: 56.212,
-    sourceTimestamp: "0:57",
+    targetMoment: "Catch it the instant the cymbal crashes into the chorus.",
+    targetTime: 60.785,
+    startOffset: 40.0, // 0:40
+    sourceTimestamp: "buzzer 1:00, playback starts 0:40",
     analyzed: true
   },
   {
@@ -160,20 +152,26 @@ const SONGS = [
     artist: "Phil Collins",
     targetMoment: "Catch the very first hit of the most famous drum fill ever.",
     targetTime: 221.796,
-    sourceTimestamp: "3:41 (fill runs \u2248 3:41\u20133:47, several hits \u2014 this is the first)",
+    startOffset: 157.0, // 2:37
+    endOffset: 232.0,   // extended a little past the requested 3:20 so the
+                         // fill itself (the actual target, ~3:41\u20133:47)
+                         // is still inside the trimmed window \u2014 see note
+                         // to the team about this.
+    sourceTimestamp: "playback 2:37\u20133:20 as requested; window extended to ~3:52 so the fill itself stays reachable",
     analyzed: true
   }
 ];
 
 // Global pass/fail windows (in milliseconds) around each song's targetTime.
-// Any song can override either one individually with its own
-// `perfectToleranceMs` / `greatToleranceMs` field.
+// Inside PERFECT = "Perfect!", inside GOOD (but outside PERFECT) = "Good!",
+// outside both = "Missed It". Any song can override either one with its own
+// `perfectToleranceMs` / `goodToleranceMs` field.
 const DEFAULT_PERFECT_TOLERANCE_MS = 150;
-const DEFAULT_GREAT_TOLERANCE_MS   = 350;
+const DEFAULT_GOOD_TOLERANCE_MS    = 500;
 
 // Don't touch this — script.js expects `SONGS` as a plain array on window.
 if (typeof window !== "undefined") {
   window.SONGS = SONGS;
   window.DEFAULT_PERFECT_TOLERANCE_MS = DEFAULT_PERFECT_TOLERANCE_MS;
-  window.DEFAULT_GREAT_TOLERANCE_MS = DEFAULT_GREAT_TOLERANCE_MS;
+  window.DEFAULT_GOOD_TOLERANCE_MS = DEFAULT_GOOD_TOLERANCE_MS;
 }
