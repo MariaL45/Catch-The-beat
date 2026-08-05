@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Catch The Beat</title>
+<meta name="description" content="Catch The Beat — listen for the moment, hit the cymbal, and see how close you were." />
+<link rel="icon" type="image/png" href="assets/images/icon-512.png" />
+<link rel="apple-touch-icon" href="assets/images/icon-512.png" />
+
+<!-- Fonts: Bebas Neue for the big poster-style display type, Space Grotesk for UI/body -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app" class="app" aria-live="polite">
+
+  <!-- ===================== BACKGROUND ===================== -->
+  <img class="bg-image" src="assets/images/background.jpg" alt="" aria-hidden="true" />
+  <div class="bg-vignette" aria-hidden="true"></div>
+
+  <!-- ===================== STAGE ===================== -->
+  <main class="stage">
+
+    <!-- ---- Header ---- -->
+    <header class="stage-header">
+      <p class="eyebrow">Event Activation</p>
+      <h1 class="title">Catch <span class="title-accent">The</span> Beat</h1>
+    </header>
+
+    <!-- ---- Vinyl + Tonearm ---- -->
+    <section class="vinyl-zone" aria-label="Start the game by tapping the record">
+      <div class="vinyl-wrap">
+        <div class="vinyl-glow" aria-hidden="true"></div>
+
+        <button id="vinylBtn" class="vinyl-hit-target" type="button" aria-label="Tap the record to start">
+          <div class="vinyl" id="vinyl">
+            <img src="assets/images/icon-512.png" alt="" class="vinyl-img" draggable="false" />
+          </div>
+        </button>
+
+        <!-- Tonearm: pivots from top-right, needle rests off-record until playing -->
+        <div class="tonearm-pivot" id="tonearm" aria-hidden="true">
+          <div class="tonearm-arm">
+            <div class="tonearm-head"></div>
+          </div>
+          <div class="tonearm-base"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- Song info / instructions ---- -->
+    <section class="song-info" id="songInfo">
+      <p class="song-label">Now Cued Up</p>
+      <h2 class="song-title" id="songTitle">Loading…</h2>
+      <p class="song-artist" id="songArtist">&nbsp;</p>
+      <p class="song-hint">
+        <span class="hint-icon" aria-hidden="true">♪</span>
+        <span id="songHint">Getting the next track ready…</span>
+      </p>
+    </section>
+
+    <!-- ---- CTA (idle state) ---- -->
+    <button id="ctaBtn" class="cta-button" type="button" disabled>
+      <span class="cta-pulse" aria-hidden="true"></span>
+      <span class="cta-label">Tap The Record To Start</span>
+    </button>
+
+    <!-- ---- Cymbal pad ---- -->
+    <section class="drum-zone">
+      <button id="drumPad" class="drum-pad" type="button" disabled aria-label="Cymbal — hit it on the beat">
+        <span class="drum-rim"></span>
+        <span class="drum-ring drum-ring-1"></span>
+        <span class="drum-ring drum-ring-2"></span>
+        <span class="drum-ring drum-ring-3"></span>
+        <span class="drum-center">
+          <span class="drum-center-label">HIT</span>
+        </span>
+        <span class="ripple-layer" id="rippleLayer" aria-hidden="true"></span>
+      </button>
+      <p class="drum-caption" id="drumCaption">Waiting for the record to drop…</p>
+    </section>
+
+  </main>
+
+  <!-- ===================== RESULT OVERLAY ===================== -->
+  <div class="result-overlay" id="resultOverlay" role="alert" aria-hidden="true">
+    <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+
+    <div class="result-card">
+      <p class="result-kicker" id="resultKicker">Result</p>
+      <h2 class="result-headline" id="resultHeadline">—</h2>
+      <p class="result-sub" id="resultSub">&nbsp;</p>
+
+      <div class="timing-meter" id="timingMeter" aria-hidden="true">
+        <div class="timing-meter-track">
+          <div class="timing-meter-target"></div>
+          <div class="timing-meter-zone" id="timingMeterZone"></div>
+          <div class="timing-meter-needle" id="timingMeterNeedle"></div>
+        </div>
+        <div class="timing-meter-labels">
+          <span>Early</span>
+          <span>On Beat</span>
+          <span>Late</span>
+        </div>
+      </div>
+
+      <div class="result-ms" id="resultMs">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- ===================== PROMOTER / STAFF RESET =====================
+       Nearly invisible hit target, bottom-right corner. Press and hold
+       ~1.2s to force the game back to idle. Not meant to be visible or
+       discoverable to players. -->
+  <button id="staffReset" class="staff-reset" type="button" aria-label="Staff reset"></button>
+  <div class="staff-reset-toast" id="staffResetToast">Game reset</div>
+
+</div>
+
+<script src="songs.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

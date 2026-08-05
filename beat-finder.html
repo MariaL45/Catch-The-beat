@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Beat Finder — Catch The Beat (staff tool)</title>
+<style>
+  :root{
+    --teal-deep:#1a323c; --ink:#0d1417; --gold:#f4b942; --gold-deep:#c9891f;
+    --cream:#fbf3e2; --coral:#ef7a5f; --line:rgba(255,255,255,.12);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; background:linear-gradient(180deg,#0d1417,#16262c);
+    color:var(--cream); font-family:"Space Grotesk",-apple-system,Segoe UI,Arial,sans-serif;
+    padding:28px 20px 80px;
+  }
+  .wrap{max-width:860px;margin:0 auto;}
+  h1{font-size:22px;margin:0 0 4px;}
+  .sub{color:rgba(251,243,226,.6);font-size:13.5px;margin:0 0 26px;line-height:1.5;}
+  .panel{
+    background:rgba(255,255,255,.04); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; margin-bottom:18px;
+  }
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);margin:0 0 14px;}
+  label{display:block;font-size:12px;color:rgba(251,243,226,.7);margin-bottom:6px;}
+  input[type=text], input[type=number]{
+    background:var(--ink); border:1px solid var(--line); color:var(--cream);
+    border-radius:8px; padding:9px 10px; font-size:14px; font-family:inherit; width:100%;
+  }
+  .row{display:flex; gap:12px; flex-wrap:wrap;}
+  .row > div{flex:1; min-width:130px;}
+  .drop{
+    border:2px dashed var(--line); border-radius:12px; padding:26px; text-align:center;
+    cursor:pointer; transition:border-color .2s, background .2s; font-size:14px;
+  }
+  .drop.dragover{border-color:var(--gold); background:rgba(244,185,66,.06);}
+  .drop small{display:block;margin-top:6px;color:rgba(251,243,226,.5);}
+  button{
+    font-family:inherit; cursor:pointer; border:none; border-radius:8px;
+    padding:9px 16px; font-size:13.5px; font-weight:600; color:var(--ink);
+    background:linear-gradient(135deg,#ffe1a1,var(--gold));
+  }
+  button.secondary{background:rgba(255,255,255,.08); color:var(--cream);}
+  button.ghost{background:transparent; color:var(--cream); border:1px solid var(--line);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  button:active:not(:disabled){transform:scale(.97);}
+  .controls{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px;}
+  canvas{width:100%; height:180px; display:block; background:var(--ink); border-radius:10px; touch-action:none;}
+  .canvas-wrap{position:relative;}
+  .zoomrow{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .zoomrow span{font-size:12px; color:rgba(251,243,226,.55);}
+  .nudges{display:flex; gap:6px; flex-wrap:wrap;}
+  .marker-readout{
+    display:flex; align-items:baseline; gap:10px; margin:14px 0 6px;
+  }
+  .marker-readout .big{font-size:32px; font-weight:700; font-variant-numeric:tabular-nums;}
+  .marker-readout .small{font-size:12px; color:rgba(251,243,226,.55);}
+  .output-line{
+    background:var(--ink); border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; font-family:"SFMono-Regular",Consolas,monospace; font-size:13px;
+    color:var(--gold); white-space:pre-wrap; word-break:break-all;
+  }
+  .hint{font-size:12px; color:rgba(251,243,226,.55); margin-top:8px; line-height:1.5;}
+  .status{font-size:13px; margin-top:10px; min-height:1.4em;}
+  .status.ok{color:#9be3a0;}
+  .status.err{color:var(--coral);}
+  a{color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🥁 Beat Finder</h1>
+  <p class="sub">
+    Staff-only helper for <strong>Catch The Beat</strong>. Load a song, jump near the
+    moment you described, zoom into the waveform, and click exactly on the drum
+    transient. Use the click-track preview to confirm by ear, then paste the
+    printed line straight into <code>songs.js</code>. Nothing here uploads
+    anywhere — the audio file never leaves this browser tab.
+  </p>
+
+  <div class="panel">
+    <h2>1 · Load audio</h2>
+    <div class="drop" id="dropZone">
+      Drop an MP3 here, or click to choose a file
+      <small id="fileLabel">No file loaded</small>
+    </div>
+    <input type="file" id="fileInput" accept="audio/*" style="display:none" />
+  </div>
+
+  <div class="panel" id="workPanel" style="display:none;">
+    <h2>2 · Jump to the approximate moment</h2>
+    <div class="row">
+      <div>
+        <label for="approxTime">Approximate time (mm:ss or seconds)</label>
+        <input type="text" id="approxTime" placeholder="e.g. 3:08 or 188" />
+      </div>
+      <div style="flex:0 0 auto; align-self:flex-end;">
+        <button id="jumpBtn">Jump</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="wavePanel" style="display:none;">
+    <h2>3 · Zoom in and mark the exact hit</h2>
+    <div class="zoomrow">
+      <span id="windowLabel">window: 4.0s</span>
+      <div class="nudges">
+        <button class="ghost" id="zoomOut">− zoom out</button>
+        <button class="ghost" id="zoomIn">+ zoom in</button>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="waveCanvas"></canvas>
+    </div>
+    <div class="hint">Click / tap anywhere on the waveform to drop the marker there. The tallest, sharpest spike is almost always the drum transient.</div>
+
+    <div class="marker-readout">
+      <div class="big" id="markerBig">0.000s</div>
+      <div class="small">marker position</div>
+    </div>
+
+    <div class="nudges">
+      <button class="secondary" id="nudgeM100">−100ms</button>
+      <button class="secondary" id="nudgeM10">−10ms</button>
+      <button class="secondary" id="nudgeM1">−1ms</button>
+      <button class="secondary" id="nudgeP1">+1ms</button>
+      <button class="secondary" id="nudgeP10">+10ms</button>
+      <button class="secondary" id="nudgeP100">+100ms</button>
+    </div>
+
+    <div class="controls">
+      <button id="playCtx">▶ Play from here (with click)</button>
+      <button class="secondary" id="playSlow">▶ 0.35× slow-mo</button>
+      <button class="ghost" id="stopBtn">■ Stop</button>
+    </div>
+    <div class="hint">"Play with click" plays the real song starting ~1s before the marker and mixes in a sharp reference click exactly at the marker time — if the click and the drum hit don't line up, adjust the marker and try again.</div>
+    <div class="status" id="playStatus">&nbsp;</div>
+  </div>
+
+  <div class="panel" id="outputPanel" style="display:none;">
+    <h2>4 · Copy into songs.js</h2>
+    <label for="songTitleField">Song title (for reference only)</label>
+    <input type="text" id="songTitleField" placeholder="e.g. Levitating" style="margin-bottom:12px;" />
+    <label for="momentField">Target moment (for reference only)</label>
+    <input type="text" id="momentField" placeholder="e.g. Drum hit on the 2nd clap before the first verse" style="margin-bottom:12px;" />
+    <div class="output-line" id="outputLine">targetTime: 0.000,</div>
+    <div class="controls">
+      <button id="copyBtn">Copy line</button>
+    </div>
+    <div class="status" id="copyStatus">&nbsp;</div>
+  </div>
+
+  <p class="hint">Tip: do this with real speakers or good headphones, not a laptop's built-in speaker — quiet kick/snare transients are easy to miss on tinny audio.</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const dropZone = document.getElementById("dropZone");
+  const fileInput = document.getElementById("fileInput");
+  const fileLabel = document.getElementById("fileLabel");
+  const workPanel = document.getElementById("workPanel");
+  const wavePanel = document.getElementById("wavePanel");
+  const outputPanel = document.getElementById("outputPanel");
+  const approxTimeInput = document.getElementById("approxTime");
+  const jumpBtn = document.getElementById("jumpBtn");
+  const canvas = document.getElementById("waveCanvas");
+  const windowLabel = document.getElementById("windowLabel");
+  const markerBig = document.getElementById("markerBig");
+  const playStatus = document.getElementById("playStatus");
+  const outputLine = document.getElementById("outputLine");
+  const copyBtn = document.getElementById("copyBtn");
+  const copyStatus = document.getElementById("copyStatus");
+  const songTitleField = document.getElementById("songTitleField");
+  const momentField = document.getElementById("momentField");
+
+  let audioCtx = null;
+  let audioBuffer = null;
+  let windowStart = 0;     // seconds
+  let windowDur = 4.0;     // seconds, zoom level
+  let marker = 0;          // seconds
+  let currentSources = [];
+
+  function ensureCtx() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+
+  function parseTime(str) {
+    str = str.trim();
+    if (str.includes(":")) {
+      const parts = str.split(":").map(Number);
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    return parseFloat(str);
+  }
+
+  function fmtTime(t) {
+    return t.toFixed(3) + "s";
+  }
+
+  /* ---------------- File loading ---------------- */
+  dropZone.addEventListener("click", () => fileInput.click());
+  ["dragover", "dragenter"].forEach((evt) =>
+    dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.add("dragover"); })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    dropZone.addEventListener(evt, (e) => { e.preventDefault(); dropZone.classList.remove("dragover"); })
+  );
+  dropZone.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+  fileInput.addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (f) loadFile(f);
+  });
+
+  async function loadFile(file) {
+    fileLabel.textContent = "Decoding \u201c" + file.name + "\u201d\u2026";
+    songTitleField.value = file.name.replace(/\.[^.]+$/, "");
+    try {
+      const ctx = ensureCtx();
+      const arr = await file.arrayBuffer();
+      audioBuffer = await ctx.decodeAudioData(arr);
+      fileLabel.textContent = file.name + " \u2014 " + audioBuffer.duration.toFixed(2) + "s loaded";
+      workPanel.style.display = "";
+      wavePanel.style.display = "";
+      outputPanel.style.display = "";
+      marker = 0;
+      windowStart = 0;
+      resizeCanvas();
+      draw();
+      updateOutput();
+    } catch (err) {
+      fileLabel.textContent = "Could not decode that file \u2014 try a different MP3/WAV.";
+      console.error(err);
+    }
+  }
+
+  /* ---------------- Jump / zoom ---------------- */
+  jumpBtn.addEventListener("click", () => {
+    const t = parseTime(approxTimeInput.value);
+    if (isNaN(t) || !audioBuffer) return;
+    marker = Math.max(0, Math.min(audioBuffer.duration, t));
+    windowStart = Math.max(0, marker - windowDur / 2);
+    draw();
+    updateOutput();
+  });
+
+  document.getElementById("zoomIn").addEventListener("click", () => {
+    windowDur = Math.max(0.25, windowDur / 2);
+    centerWindowOnMarker();
+  });
+  document.getElementById("zoomOut").addEventListener("click", () => {
+    windowDur = Math.min(30, windowDur * 2);
+    centerWindowOnMarker();
+  });
+  function centerWindowOnMarker() {
+    if (!audioBuffer) return;
+    windowStart = Math.max(0, Math.min(audioBuffer.duration - windowDur, marker - windowDur / 2));
+    draw();
+  }
+
+  /* ---------------- Canvas / waveform ---------------- */
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+  }
+  window.addEventListener("resize", () => { resizeCanvas(); draw(); });
+
+  function draw() {
+    if (!audioBuffer) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const data = audioBuffer.getChannelData(0);
+    const sr = audioBuffer.sampleRate;
+    const startSample = Math.floor(windowStart * sr);
+    const endSample = Math.min(data.length, Math.floor((windowStart + windowDur) * sr));
+    const totalSamples = Math.max(1, endSample - startSample);
+    const samplesPerPx = totalSamples / w;
+
+    ctx.strokeStyle = "rgba(251,243,226,0.15)";
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#f4b942";
+    for (let x = 0; x < w; x++) {
+      const s0 = startSample + Math.floor(x * samplesPerPx);
+      const s1 = Math.min(data.length, startSample + Math.floor((x + 1) * samplesPerPx));
+      let min = 1, max = -1;
+      for (let i = s0; i < s1; i++) {
+        const v = data[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+      if (s1 <= s0) { min = 0; max = 0; }
+      const y0 = (1 - (max + 1) / 2) * h;
+      const y1 = (1 - (min + 1) / 2) * h;
+      ctx.fillRect(x, y0, 1, Math.max(1, y1 - y0));
+    }
+
+    // marker line
+    const markerX = ((marker - windowStart) / windowDur) * w;
+    if (markerX >= 0 && markerX <= w) {
+      ctx.strokeStyle = "#ef7a5f";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(markerX, 0); ctx.lineTo(markerX, h);
+      ctx.stroke();
+    }
+
+    windowLabel.textContent = "window: " + windowDur.toFixed(2) + "s  (" + windowStart.toFixed(2) + "s \u2013 " + (windowStart + windowDur).toFixed(2) + "s)";
+  }
+
+  function canvasClickToTime(clientX) {
+    const rect = canvas.getBoundingClientRect();
+    const frac = (clientX - rect.left) / rect.width;
+    return windowStart + frac * windowDur;
+  }
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!audioBuffer) return;
+    marker = Math.max(0, Math.min(audioBuffer.duration, canvasClickToTime(e.clientX)));
+    draw();
+    updateOutput();
+  });
+
+  /* ---------------- Nudges ---------------- */
+  function nudge(ms) {
+    if (!audioBuffer) return;
+    marker = Math.max(0, Math.min(audioBuffer.duration, marker + ms / 1000));
+    draw();
+    updateOutput();
+  }
+  document.getElementById("nudgeM100").addEventListener("click", () => nudge(-100));
+  document.getElementById("nudgeM10").addEventListener("click", () => nudge(-10));
+  document.getElementById("nudgeM1").addEventListener("click", () => nudge(-1));
+  document.getElementById("nudgeP1").addEventListener("click", () => nudge(1));
+  document.getElementById("nudgeP10").addEventListener("click", () => nudge(10));
+  document.getElementById("nudgeP100").addEventListener("click", () => nudge(100));
+
+  /* ---------------- Playback ---------------- */
+  function stopAll() {
+    currentSources.forEach((s) => { try { s.stop(); } catch (e) {} });
+    currentSources = [];
+    playStatus.textContent = "";
+    playStatus.className = "status";
+  }
+  document.getElementById("stopBtn").addEventListener("click", stopAll);
+
+  function makeClickBuffer(ctx) {
+    const dur = 0.05;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      const t = i / ctx.sampleRate;
+      d[i] = Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t * 90);
+    }
+    return buf;
+  }
+
+  document.getElementById("playCtx").addEventListener("click", () => {
+    if (!audioBuffer) return;
+    stopAll();
+    const ctx = ensureCtx();
+    const lead = 1.0;
+    const start = Math.max(0, marker - lead);
+
+    const src = ctx.createBufferSource();
+    src.buffer = audioBuffer;
+    src.connect(ctx.destination);
+    src.start(0, start);
+    currentSources.push(src);
+
+    const click = ctx.createBufferSource();
+    click.buffer = makeClickBuffer(ctx);
+    const clickGain = ctx.createGain();
+    clickGain.gain.value = 0.9;
+    click.connect(clickGain).connect(ctx.destination);
+    const delay = Math.max(0, marker - start);
+    click.start(ctx.currentTime + delay);
+    currentSources.push(click);
+
+    playStatus.textContent = "Playing \u2014 listen for the click landing on the drum hit\u2026";
+    playStatus.className = "status ok";
+    src.onended = () => { playStatus.textContent = ""; };
+  });
+
+  document.getElementById("playSlow").addEventListener("click", () => {
+    if (!audioBuffer) return;
+    stopAll();
+    const ctx = ensureCtx();
+    const lead = 1.2;
+    const start = Math.max(0, marker - lead);
+    const src = ctx.createBufferSource();
+    src.buffer = audioBuffer;
+    src.playbackRate.value = 0.35;
+    src.connect(ctx.destination);
+    src.start(0, start);
+    currentSources.push(src);
+    playStatus.textContent = "Playing at 0.35\u00d7 speed (pitch will drop \u2014 that's expected)\u2026";
+    playStatus.className = "status ok";
+  });
+
+  /* ---------------- Output ---------------- */
+  function updateOutput() {
+    markerBig.textContent = fmtTime(marker);
+    refreshOutputLine();
+  }
+  function refreshOutputLine() {
+    const t = marker.toFixed(3);
+    outputLine.textContent =
+      "audio: \"" + (songTitleField.value || "SONG.mp3") + "\",\n" +
+      "title: \"" + (songTitleField.value || "") + "\",\n" +
+      "targetMoment: \"" + (momentField.value || "") + "\",\n" +
+      "targetTime: " + t + "  // paste this whole block into songs.js";
+  }
+  songTitleField.addEventListener("input", refreshOutputLine);
+  momentField.addEventListener("input", refreshOutputLine);
+
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(outputLine.textContent);
+      copyStatus.textContent = "Copied \u2014 paste it into the matching song in songs.js.";
+      copyStatus.className = "status ok";
+    } catch (err) {
+      copyStatus.textContent = "Couldn't copy automatically \u2014 select the text above and copy manually.";
+      copyStatus.className = "status err";
+    }
+  });
+})();
+</script>
+</body>
+</html>
