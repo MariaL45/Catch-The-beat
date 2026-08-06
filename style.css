@@ -108,7 +108,7 @@ img { -webkit-user-drag: none; user-select: none; }
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: clamp(10px, 2.4vh, 24px) clamp(16px, 5vw, 32px) clamp(8px, 1.6vh, 16px);
+  padding: clamp(10px, 2.4vh, 24px) clamp(16px, 5vw, 32px) 32vh;
   text-align: center;
 }
 
@@ -149,12 +149,12 @@ img { -webkit-user-drag: none; user-select: none; }
 
 .vinyl-wrap {
   position: relative;
-  width: clamp(280px, 74vh, 580px);
+  width: clamp(260px, 50vh, 580px);
   aspect-ratio: 1 / 1;
   transition: width 0.4s var(--ease-smooth);
 }
 .app.is-playing .vinyl-wrap {
-  width: clamp(225px, 50vh, 420px);
+  width: clamp(210px, 42vh, 420px);
 }
 
 .vinyl-glow {
@@ -413,8 +413,8 @@ img { -webkit-user-drag: none; user-select: none; }
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 42%;
-  height: 42%;
+  width: 25%;
+  height: 25%;
   pointer-events: none;
   opacity: 1;
   transition: opacity 0.3s ease;
@@ -432,20 +432,19 @@ img { -webkit-user-drag: none; user-select: none; }
 
 /* -------------------------------- Drum pad -------------------------------- */
 .drum-zone {
-  flex: 1 1 auto;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 67.89%; /* matches the requested 37cm top edge on a 54.5cm-tall screen */
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 0;
-  width: 100%;
-  margin-top: clamp(34px, 7vh, 68px);
   gap: clamp(10px, 2vh, 16px);
 }
 
 .drum-pad {
   position: relative;
-  width: clamp(225px, 54vh, 510px);
+  width: clamp(180px, 22.94vh, 460px);
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   padding: 0;
