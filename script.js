@@ -270,6 +270,19 @@
     sourceNode = null;
   }
 
+  // Used on reset (idle button or auto-reset) — audio needs to go
+  // completely silent right now, not fade out over half a second.
+  function hardStopAudio() {
+    if (sourceNode) {
+      try { sourceNode.onended = null; sourceNode.stop(); } catch (e) {}
+      sourceNode = null;
+    }
+    if (gainNode) {
+      try { gainNode.disconnect(); } catch (e) {}
+      gainNode = null;
+    }
+  }
+
   // The song keeps playing for a little while after the round ends (hit
   // or missed) instead of cutting out abruptly — feels much nicer than a
   // hard stop right as the result appears.
@@ -387,16 +400,25 @@
     clearTimeout(lateTimer);
     clearTimeout(postRoundFadeTimer);
     stopConfetti();
-    fadeOutAndStop();
-    if (sourceNode) { try { sourceNode.stop(); } catch (e) {} sourceNode = null; }
+    hardStopAudio(); // instant silence — no fade, this is a hard reset
 
     state = STATE.IDLE;
     appEl.classList.remove("is-playing");
     appEl.classList.add("is-idle");
 
-    resultOverlay.classList.remove("is-visible");
+    // Result overlay: hide it and defensively wipe every field inside it,
+    // so nothing stale is even present if the next round is interrupted
+    // mid-transition.
+    resultOverlay.classList.remove("is-visible", "tier-perfect", "tier-good", "tier-miss");
     resultOverlay.setAttribute("aria-hidden", "true");
-    setTimeout(() => resultOverlay.classList.remove("tier-perfect", "tier-good", "tier-miss"), 400);
+    resultKicker.textContent = "Result";
+    resultHeadline.textContent = "\u2014";
+    resultSub.textContent = "\u00a0";
+    resultMs.textContent = "\u00a0";
+    resultMs.className = "result-ms";
+    resultMs.style.display = "none";
+    timingMeter.style.display = "none";
+    timingMeterNeedle.style.left = "50%";
 
     drumPad.disabled = true;
     drumPad.classList.remove("is-active", "is-hit");
@@ -486,18 +508,11 @@
     if (confettiCtx) confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
   }
 
-  /* --------------------------- Staff reset (hidden) ------------------------ */
-  let holdTimer = null;
-  function armHold() {
-    clearTimeout(holdTimer);
-    holdTimer = setTimeout(() => { resetToIdle(true); }, 1200);
-  }
-  function disarmHold() { clearTimeout(holdTimer); }
-
-  staffResetBtn.addEventListener("pointerdown", armHold);
-  ["pointerup", "pointerleave", "pointercancel"].forEach((evt) =>
-    staffResetBtn.addEventListener(evt, disarmHold)
-  );
+  /* --------------------------------- Idle / reset button -------------------
+     Fires immediately on click/tap — no hold, no delay. It's a real button
+     now (visible, if faint), so it needs to behave like one: press it,
+     the game is instantly back to idle. */
+  staffResetBtn.addEventListener("click", () => resetToIdle(true));
 
   /* --------------------------------- Events -------------------------------- */
   vinylBtn.addEventListener("click", onStartRequested);

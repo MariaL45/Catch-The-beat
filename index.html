@@ -58,15 +58,26 @@
       <span class="cta-label">Spin The Record</span>
     </button>
 
-    <!-- ---- Song info / instructions ---- -->
+    <!-- ---- Song title + instructions ---- -->
     <section class="song-info" id="songInfo">
-      <p class="song-label">Now Cued Up</p>
       <h2 class="song-title" id="songTitle">Loading…</h2>
       <p class="song-artist" id="songArtist">&nbsp;</p>
-      <p class="song-hint">
-        <span class="hint-icon" aria-hidden="true">♪</span>
-        <span id="songHint">Getting the next track ready…</span>
-      </p>
+
+      <div class="instruction-wrap">
+        <span class="instruction-deco instruction-deco-left" aria-hidden="true">
+          <span class="mini-cymbal"></span>
+          <span class="note note-a">♪</span>
+          <span class="note note-b">♫</span>
+        </span>
+
+        <p class="instruction-text" id="songHint">Getting the next track ready…</p>
+
+        <span class="instruction-deco instruction-deco-right" aria-hidden="true">
+          <span class="mini-cymbal"></span>
+          <span class="note note-c">♬</span>
+          <span class="note note-d">♪</span>
+        </span>
+      </div>
     </section>
 
     <!-- ---- Cymbal pad ---- -->
