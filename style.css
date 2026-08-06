@@ -113,7 +113,10 @@ img { -webkit-user-drag: none; user-select: none; }
 }
 
 /* --------------------------------- Header ------------------------------- */
-.stage-header { flex: 0 0 auto; }
+.stage-header {
+  flex: 0 0 auto;
+  padding-top: clamp(14px, 4vh, 34px);
+}
 
 .title {
   margin: 0;
@@ -146,12 +149,12 @@ img { -webkit-user-drag: none; user-select: none; }
 
 .vinyl-wrap {
   position: relative;
-  width: clamp(255px, 66vh, 520px);
+  width: clamp(280px, 74vh, 580px);
   aspect-ratio: 1 / 1;
   transition: width 0.4s var(--ease-smooth);
 }
 .app.is-playing .vinyl-wrap {
-  width: clamp(210px, 48vh, 400px);
+  width: clamp(225px, 50vh, 420px);
 }
 
 .vinyl-glow {
@@ -402,54 +405,30 @@ img { -webkit-user-drag: none; user-select: none; }
 .instruction-deco-right .note-c { top: -8px; right: -2px; font-size: 13px; transform: rotate(14deg); }
 .instruction-deco-right .note-d { bottom: -6px; right: 13px; font-size: 9px; opacity: 0.35; transform: rotate(-10deg); }
 
-/* -------------------------------- CTA button ------------------------------ */
-.cta-button {
-  position: relative;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(12px, 2vh, 16px) clamp(28px, 7vw, 42px);
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--gold-soft), var(--gold) 55%, var(--gold-deep));
-  color: var(--ink);
-  font-weight: 700;
-  font-size: clamp(13px, 3vw, 16px);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  box-shadow: 0 10px 26px rgba(244,185,66,0.35), 0 2px 0 rgba(255,255,255,0.35) inset;
-  transition: opacity 0.3s var(--ease-smooth), transform 0.3s var(--ease-smooth), filter 0.3s ease,
-              padding 0.35s var(--ease-smooth), margin 0.35s var(--ease-smooth), max-height 0.35s var(--ease-smooth);
-  margin: clamp(4px, 1.6vh, 14px) 0;
-  max-height: 120px;
-  overflow: hidden;
-}
-.cta-button:disabled { filter: grayscale(0.6) brightness(0.85); }
-.cta-button:active:not(:disabled) { transform: scale(0.96); }
-.cta-pulse {
+/* ---------------------- "Spin The Record" (in the label) ------------------
+   Sits inside the vinyl's yellow centre label (baked into the artwork),
+   so the record itself reads as the button — no separate CTA element. */
+.vinyl-cta-label {
   position: absolute;
-  inset: -6px;
-  border-radius: inherit;
-  border: 2px solid rgba(244,185,66,0.6);
-  opacity: 0;
-}
-.app.is-idle .cta-button:not(:disabled) .cta-pulse {
-  animation: ctaPulse 2.2s ease-out infinite;
-}
-@keyframes ctaPulse {
-  0% { opacity: 0.6; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.18); }
-}
-.cta-label { position: relative; z-index: 1; }
-
-.app:not(.is-idle) .cta-button {
-  opacity: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40%;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(8.5px, 2.5vw, 12.5px);
+  line-height: 1.08;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-transform: uppercase;
   pointer-events: none;
-  transform: translateY(6px) scale(0.94);
-  padding-top: 0;
-  padding-bottom: 0;
-  margin: 0;
-  max-height: 0;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+}
+.app:not(.is-idle) .vinyl-cta-label {
+  opacity: 0;
 }
 
 /* -------------------------------- Drum pad -------------------------------- */
@@ -461,12 +440,13 @@ img { -webkit-user-drag: none; user-select: none; }
   justify-content: center;
   min-height: 0;
   width: 100%;
+  margin-top: clamp(18px, 3.6vh, 36px);
   gap: clamp(10px, 2vh, 16px);
 }
 
 .drum-pad {
   position: relative;
-  width: clamp(200px, 47vh, 390px);
+  width: clamp(225px, 54vh, 510px);
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   padding: 0;
@@ -731,6 +711,28 @@ img { -webkit-user-drag: none; user-select: none; }
   margin-top: 8px;
 }
 
+/* ============================ Screen saver ================================ */
+.screensaver {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s var(--ease-smooth);
+}
+.screensaver.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.screensaver-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* ============================ Staff reset ================================
    Event-staff-only control, not a player-facing "home" button. Faint on
    purpose — visible enough that staff who know to look in the corner can
@@ -785,7 +787,6 @@ img { -webkit-user-drag: none; user-select: none; }
 @media (prefers-reduced-motion: reduce) {
   .app.is-playing .vinyl,
   .app.is-playing .vinyl-glow,
-  .cta-pulse,
   .drum-pad.is-active:not(:disabled)::before,
   .vinyl-hit-target::after {
     animation: none !important;

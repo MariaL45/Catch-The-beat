@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-<link rel="stylesheet" href="style.css?v=3" />
+<link rel="stylesheet" href="style.css?v=4" />
 </head>
 <body>
 
@@ -39,6 +39,7 @@
         <button id="vinylBtn" class="vinyl-hit-target" type="button" aria-label="Spin the record to start">
           <div class="vinyl" id="vinyl">
             <img src="assets/images/icon-512.png" alt="" class="vinyl-img" draggable="false" />
+            <span class="vinyl-cta-label" id="vinylCtaLabel">Spin The Record</span>
           </div>
         </button>
 
@@ -51,12 +52,6 @@
         </div>
       </div>
     </section>
-
-    <!-- ---- CTA (idle state) — sits directly under the record ---- -->
-    <button id="ctaBtn" class="cta-button" type="button" disabled>
-      <span class="cta-pulse" aria-hidden="true"></span>
-      <span class="cta-label">Spin The Record</span>
-    </button>
 
     <!-- ---- Song title + instructions ---- -->
     <section class="song-info" id="songInfo">
@@ -123,16 +118,35 @@
     </div>
   </div>
 
+  <!-- ===================== SCREEN SAVER =====================
+       Kicks in after a configurable period of no touches anywhere (see
+       SCREENSAVER_IDLE_MS in script.js). Any touch closes it and returns
+       to a clean idle screen. Swap assets/videos/screensaver.mp4 for your
+       own video — nothing else needs to change. -->
+  <div class="screensaver" id="screensaver" aria-hidden="true">
+    <video
+      id="screensaverVideo"
+      class="screensaver-video"
+      src="assets/videos/screensaver.mp4"
+      muted
+      loop
+      playsinline
+      preload="auto"
+    ></video>
+  </div>
+
   <!-- ===================== PROMOTER / STAFF RESET =====================
-       Nearly invisible hit target, bottom-right corner. Press and hold
-       ~1.2s to force the game back to idle. Not meant to be visible or
-       discoverable to players. -->
+       Nearly invisible hit target, bottom-right corner. A single tap
+       instantly forces the game back to idle. Not meant to be visible or
+       discoverable to players. A second, completely invisible option
+       exists too: triple-tapping anywhere on the screen within ~2s does
+       the exact same full reset, from any state — see script.js. -->
   <button id="staffReset" class="staff-reset" type="button" aria-label="Staff reset">⟲</button>
   <div class="staff-reset-toast" id="staffResetToast">Game reset</div>
 
 </div>
 
-<script src="songs.js?v=3"></script>
-<script src="script.js?v=3"></script>
+<script src="songs.js?v=4"></script>
+<script src="script.js?v=4"></script>
 </body>
 </html>

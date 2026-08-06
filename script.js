@@ -12,7 +12,6 @@
   /* ------------------------------ DOM refs ------------------------------ */
   const appEl            = document.getElementById("app");
   const vinylBtn          = document.getElementById("vinylBtn");
-  const ctaBtn            = document.getElementById("ctaBtn");
   const drumPad           = document.getElementById("drumPad");
   const rippleLayer       = document.getElementById("rippleLayer");
   const drumCaption       = document.getElementById("drumCaption");
@@ -29,6 +28,8 @@
   const confettiCanvas    = document.getElementById("confettiCanvas");
   const staffResetBtn     = document.getElementById("staffReset");
   const staffResetToast   = document.getElementById("staffResetToast");
+  const screensaverEl     = document.getElementById("screensaver");
+  const screensaverVideo  = document.getElementById("screensaverVideo");
 
   /* ------------------------------- Config -------------------------------- */
   const AUDIO_BASE       = "assets/audio/";
@@ -41,6 +42,16 @@
   const LATE_GRACE_MS   = 5500;  // if nobody hits the pad this long after the target, auto-resolve as a miss
   const POST_ROUND_PLAY_MS = 3200; // how long the song keeps playing after a hit/miss before fading out
   const TOAST_MS         = 1600;
+
+  // Screen saver: kicks in after this long with zero touches anywhere on
+  // the screen. Change the number, nothing else — swap the video file at
+  // assets/videos/screensaver.mp4, also nothing else to configure.
+  const SCREENSAVER_IDLE_MS = 30 * 60 * 1000; // 30 minutes
+  const SCREENSAVER_VIDEO_SRC = "assets/videos/screensaver.mp4";
+
+  // Hidden staff gesture: 3 taps anywhere on the screen within this many
+  // ms triggers an instant full reset, from any state.
+  const TRIPLE_TAP_WINDOW_MS = 2000;
 
   const songs = Array.isArray(window.SONGS) ? window.SONGS.slice() : [];
   // Two windows around the exact beat: inside the tighter one = "Perfect!",
@@ -178,14 +189,12 @@
 
     isReady = false;
     currentBuffer = null;
-    ctaBtn.disabled = true;
 
     preloadSong(index).then((buf) => {
       // Guard against a reset happening while this was in flight.
       if (currentSongIndex !== index) return;
       currentBuffer = buf;
       isReady = true;
-      ctaBtn.disabled = false;
       if (pendingStart) {
         pendingStart = false;
         beginPlayback();
@@ -508,6 +517,88 @@
     if (confettiCtx) confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
   }
 
+  /* ------------------------------ Screen saver -----------------------------
+     Activates after SCREENSAVER_IDLE_MS with no touches anywhere. Any touch
+     while it's showing closes it instantly and drops back to a guaranteed-
+     clean idle screen. */
+  let inactivityTimer = null;
+  let screensaverActive = false;
+  let screensaverWarned = false;
+
+  function armInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(showScreensaver, SCREENSAVER_IDLE_MS);
+  }
+
+  function showScreensaver() {
+    if (screensaverActive) return;
+    screensaverActive = true;
+
+    // Whatever was happening, land on a guaranteed-clean idle state
+    // underneath the screen saver first.
+    resetToIdle(false);
+
+    screensaverEl.classList.add("is-visible");
+    screensaverEl.setAttribute("aria-hidden", "false");
+
+    try { screensaverVideo.currentTime = 0; } catch (e) {}
+    const playPromise = screensaverVideo.play();
+    if (playPromise && playPromise.catch) {
+      playPromise.catch((err) => {
+        // Missing file, unsupported format, or autoplay blocked — fail
+        // silently in the UI; log once so it's easy to diagnose.
+        if (!screensaverWarned) {
+          screensaverWarned = true;
+          console.warn(
+            "[Catch The Beat] Screen saver video didn't start (" + SCREENSAVER_VIDEO_SRC +
+            "). Make sure that file exists.", err
+          );
+        }
+      });
+    }
+  }
+
+  function hideScreensaver() {
+    if (!screensaverActive) return;
+    screensaverActive = false;
+
+    screensaverEl.classList.remove("is-visible");
+    screensaverEl.setAttribute("aria-hidden", "true");
+    screensaverVideo.pause();
+    try { screensaverVideo.currentTime = 0; } catch (e) {}
+
+    // Guarantee the game is sitting at a clean idle screen, ready for
+    // the next participant.
+    resetToIdle(false);
+    armInactivityTimer();
+  }
+
+  /* --------------------------- Global touch handling -----------------------
+     One listener does double duty:
+       1. Resets the screen-saver countdown on any touch.
+       2. Dismisses the screen saver instantly if it's showing.
+       3. Tracks the hidden triple-tap-anywhere gesture for staff. */
+  let tapTimestamps = [];
+
+  function handleGlobalPointerDown() {
+    if (screensaverActive) {
+      hideScreensaver();
+      return;
+    }
+
+    armInactivityTimer();
+
+    const now = Date.now();
+    tapTimestamps.push(now);
+    tapTimestamps = tapTimestamps.filter((t) => now - t <= TRIPLE_TAP_WINDOW_MS);
+    if (tapTimestamps.length >= 3) {
+      tapTimestamps = [];
+      resetToIdle(true);
+    }
+  }
+
+  document.addEventListener("pointerdown", handleGlobalPointerDown, { passive: true });
+
   /* --------------------------------- Idle / reset button -------------------
      Fires immediately on click/tap — no hold, no delay. It's a real button
      now (visible, if faint), so it needs to behave like one: press it,
@@ -516,7 +607,6 @@
 
   /* --------------------------------- Events -------------------------------- */
   vinylBtn.addEventListener("click", onStartRequested);
-  ctaBtn.addEventListener("click", onStartRequested);
 
   // pointerdown (not click) on the drum pad: fires as early as physically
   // possible, which matters a lot when we're judging milliseconds.
@@ -538,6 +628,7 @@
     drumCaption.textContent = "Waiting for the record to drop\u2026";
     const firstIndex = drawNextIndex();
     loadRound(firstIndex);
+    armInactivityTimer();
   }
 
   init();
